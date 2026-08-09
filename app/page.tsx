@@ -19,29 +19,59 @@ type FlightResult = {
   warning: string;
 };
 
+type AirportSuggestion = {
+  iataCode: string;
+  name: string;
+  subType: string;
+  cityName: string;
+  countryName: string;
+  label: string;
+};
+
+const API_URL = "https://flight-ai-backend.onrender.com";
+
 export default function Home() {
   const [fromAirport, setFromAirport] = useState("GOT");
   const [toAirport, setToAirport] = useState("YYZ");
   const [departureDate, setDepartureDate] = useState("");
+  const [fromSuggestions, setFromSuggestions] = useState<AirportSuggestion[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<AirportSuggestion[]>([]);
   const [data, setData] = useState<FlightResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function isValidAirportCode(code: string) {
-    return /^[A-Z]{3}$/.test(code);
+  async function loadSuggestions(value: string, type: "from" | "to") {
+    if (value.trim().length < 2) {
+      if (type === "from") setFromSuggestions([]);
+      if (type === "to") setToSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/location-search?keyword=${encodeURIComponent(value)}`
+      );
+
+      const result = await response.json();
+
+      if (type === "from") setFromSuggestions(result);
+      if (type === "to") setToSuggestions(result);
+    } catch {
+      // Keep UI silent while typing
+    }
   }
 
   function validateInputs() {
-    if (!isValidAirportCode(fromAirport)) {
-      return "From airport must be 3 letters, example GOT, ARN, CPH.";
+    if (!fromAirport.trim()) {
+      return "Please enter from airport, city, or country.";
     }
 
-    if (!isValidAirportCode(toAirport)) {
-      return "To airport must be 3 letters, example YYZ, LHR, IST.";
+    if (!toAirport.trim()) {
+      return "Please enter to airport, city, or country.";
     }
 
-    if (fromAirport === toAirport) {
-      return "From and To airport cannot be the same.";
+    if (fromAirport.trim().toUpperCase() === toAirport.trim().toUpperCase()) {
+      return "From and To cannot be the same.";
     }
 
     if (!departureDate) {
@@ -75,19 +105,33 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `https://flight-ai-backend.onrender.com/search?from_airport=${fromAirport}&to_airport=${toAirport}&departure_date=${departureDate}`
+        `${API_URL}/search?from_airport=${encodeURIComponent(fromAirport)}&to_airport=${encodeURIComponent(toAirport)}&departure_date=${departureDate}`
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error("Backend error");
+        setError(result.detail || "Search failed.");
+        return;
       }
 
-      const result = await response.json();
       setData(result);
-    } catch (error) {
-      setError("Could not connect to Python backend.");
+    } catch {
+      setError("Could not connect to backend.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function selectSuggestion(item: AirportSuggestion, type: "from" | "to") {
+    if (type === "from") {
+      setFromAirport(item.iataCode);
+      setFromSuggestions([]);
+    }
+
+    if (type === "to") {
+      setToAirport(item.iataCode);
+      setToSuggestions([]);
     }
   }
 
@@ -100,18 +144,13 @@ export default function Home() {
         background: "#f4f7fb",
       }}
     >
-      <section
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-        }}
-      >
+      <section style={{ maxWidth: "900px", margin: "0 auto" }}>
         <h1 style={{ fontSize: "42px", marginBottom: "10px" }}>
           Flight AI
         </h1>
 
         <p style={{ fontSize: "18px", color: "#444" }}>
-          Search cheaper flight routes using your online Python backend.
+          Type airport code, city, or country. Flight AI will suggest the correct airport.
         </p>
 
         <div
@@ -121,35 +160,112 @@ export default function Home() {
             marginTop: "25px",
             marginBottom: "15px",
             flexWrap: "wrap",
+            alignItems: "flex-start",
           }}
         >
-          <input
-            value={fromAirport}
-            onChange={(e) => setFromAirport(e.target.value.toUpperCase())}
-            maxLength={3}
-            placeholder="From, example GOT"
-            style={{
-              padding: "14px",
-              fontSize: "16px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-              width: "170px",
-            }}
-          />
+          <div style={{ position: "relative" }}>
+            <input
+              value={fromAirport}
+              onChange={(e) => {
+                setFromAirport(e.target.value);
+                loadSuggestions(e.target.value, "from");
+              }}
+              placeholder="From, example GOT or Gothenburg"
+              style={{
+                padding: "14px",
+                fontSize: "16px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                width: "250px",
+              }}
+            />
 
-          <input
-            value={toAirport}
-            onChange={(e) => setToAirport(e.target.value.toUpperCase())}
-            maxLength={3}
-            placeholder="To, example YYZ"
-            style={{
-              padding: "14px",
-              fontSize: "16px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-              width: "170px",
-            }}
-          />
+            {fromSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "55px",
+                  left: 0,
+                  width: "360px",
+                  background: "white",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  zIndex: 10,
+                }}
+              >
+                {fromSuggestions.map((item) => (
+                  <div
+                    key={`${item.iataCode}-${item.name}`}
+                    onClick={() => selectSuggestion(item, "from")}
+                    style={{
+                      padding: "12px",
+                      cursor: "pointer",
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    <strong>{item.iataCode}</strong> - {item.name}
+                    <br />
+                    <span style={{ color: "#555", fontSize: "13px" }}>
+                      {item.cityName}, {item.countryName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: "relative" }}>
+            <input
+              value={toAirport}
+              onChange={(e) => {
+                setToAirport(e.target.value);
+                loadSuggestions(e.target.value, "to");
+              }}
+              placeholder="To, example YYZ or Toronto"
+              style={{
+                padding: "14px",
+                fontSize: "16px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                width: "250px",
+              }}
+            />
+
+            {toSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "55px",
+                  left: 0,
+                  width: "360px",
+                  background: "white",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  zIndex: 10,
+                }}
+              >
+                {toSuggestions.map((item) => (
+                  <div
+                    key={`${item.iataCode}-${item.name}`}
+                    onClick={() => selectSuggestion(item, "to")}
+                    style={{
+                      padding: "12px",
+                      cursor: "pointer",
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    <strong>{item.iataCode}</strong> - {item.name}
+                    <br />
+                    <span style={{ color: "#555", fontSize: "13px" }}>
+                      {item.cityName}, {item.countryName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <input
             type="date"
