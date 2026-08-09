@@ -5,6 +5,7 @@ import { useState } from "react";
 type FlightResult = {
   from: string;
   to: string;
+  departure_date: string;
   currency: string;
   direct_ticket: {
     route: string;
@@ -21,22 +22,70 @@ type FlightResult = {
 export default function Home() {
   const [fromAirport, setFromAirport] = useState("GOT");
   const [toAirport, setToAirport] = useState("YYZ");
+  const [departureDate, setDepartureDate] = useState("");
   const [data, setData] = useState<FlightResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  function isValidAirportCode(code: string) {
+    return /^[A-Z]{3}$/.test(code);
+  }
+
+  function validateInputs() {
+    if (!isValidAirportCode(fromAirport)) {
+      return "From airport must be 3 letters, example GOT, ARN, CPH.";
+    }
+
+    if (!isValidAirportCode(toAirport)) {
+      return "To airport must be 3 letters, example YYZ, LHR, IST.";
+    }
+
+    if (fromAirport === toAirport) {
+      return "From and To airport cannot be the same.";
+    }
+
+    if (!departureDate) {
+      return "Please select a departure date.";
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selectedDate = new Date(departureDate);
+
+    if (selectedDate < today) {
+      return "Departure date cannot be in the past.";
+    }
+
+    return "";
+  }
 
   async function searchFlight() {
-    setLoading(true);
+    setError("");
     setData(null);
+
+    const validationError = validateInputs();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const response = await fetch(
-        `https://flight-ai-backend.onrender.com/search?from_airport=${fromAirport}&to_airport=${toAirport}`
+        `https://flight-ai-backend.onrender.com/search?from_airport=${fromAirport}&to_airport=${toAirport}&departure_date=${departureDate}`
       );
+
+      if (!response.ok) {
+        throw new Error("Backend error");
+      }
 
       const result = await response.json();
       setData(result);
     } catch (error) {
-      alert("Could not connect to Python backend.");
+      setError("Could not connect to Python backend.");
     } finally {
       setLoading(false);
     }
@@ -70,32 +119,48 @@ export default function Home() {
             display: "flex",
             gap: "10px",
             marginTop: "25px",
-            marginBottom: "30px",
+            marginBottom: "15px",
+            flexWrap: "wrap",
           }}
         >
           <input
             value={fromAirport}
             onChange={(e) => setFromAirport(e.target.value.toUpperCase())}
-            placeholder="From airport"
+            maxLength={3}
+            placeholder="From, example GOT"
             style={{
               padding: "14px",
               fontSize: "16px",
               borderRadius: "8px",
               border: "1px solid #ccc",
-              width: "160px",
+              width: "170px",
             }}
           />
 
           <input
             value={toAirport}
             onChange={(e) => setToAirport(e.target.value.toUpperCase())}
-            placeholder="To airport"
+            maxLength={3}
+            placeholder="To, example YYZ"
             style={{
               padding: "14px",
               fontSize: "16px",
               borderRadius: "8px",
               border: "1px solid #ccc",
-              width: "160px",
+              width: "170px",
+            }}
+          />
+
+          <input
+            type="date"
+            value={departureDate}
+            onChange={(e) => setDepartureDate(e.target.value)}
+            style={{
+              padding: "14px",
+              fontSize: "16px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              width: "180px",
             }}
           />
 
@@ -116,6 +181,21 @@ export default function Home() {
           </button>
         </div>
 
+        {error && (
+          <div
+            style={{
+              background: "#fee2e2",
+              color: "#991b1b",
+              padding: "15px",
+              borderRadius: "8px",
+              marginBottom: "25px",
+              borderLeft: "5px solid #ef4444",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {data && (
           <div style={{ display: "grid", gap: "20px" }}>
             <div
@@ -129,6 +209,7 @@ export default function Home() {
               <h2>
                 Route: {data.from} → {data.to}
               </h2>
+              <p>Date: {data.departure_date}</p>
             </div>
 
             <div
