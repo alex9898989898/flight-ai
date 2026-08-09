@@ -30,7 +30,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/search?from_airport=${fromAirport}&to_airport=${toAirport}`
+        `https://flight-ai-backend.onrender.com/search?from_airport=${fromAirport}&to_airport=${toAirport}`
       );
 
       const result = await response.json();
