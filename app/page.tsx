@@ -36,7 +36,7 @@ export default function Home() {
       const result = await response.json();
       setData(result);
     } catch (error) {
-      alert("Could not connect to Python backend. Make sure backend is running.");
+      alert("Could not connect to Python backend.");
     } finally {
       setLoading(false);
     }
@@ -62,7 +62,7 @@ export default function Home() {
         </h1>
 
         <p style={{ fontSize: "18px", color: "#444" }}>
-          Search cheaper flight routes using your Python backend.
+          Search cheaper flight routes using your online Python backend.
         </p>
 
         <div
